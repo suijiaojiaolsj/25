@@ -132,6 +132,12 @@
             const wrapper = document.getElementById('canvas-wrapper');
             const container = document.getElementById('canvas-container');
             
+            // WebGL兼容性检查
+            if (!window.WebGLRenderingContext) {
+                updateStatus("您的浏览器不支持WebGL", "#f00");
+                return;
+            }
+            
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050505);
             scene.fog = new THREE.FogExp2(0x050505, 0.002);
@@ -141,7 +147,14 @@
             camera = new THREE.PerspectiveCamera(50, wrapper.clientWidth / wrapper.clientHeight, 0.1, 1000);
             camera.position.set(0, 0, CONFIG.camDistance);
 
-            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance", stencil: false });
+            // 优化WebGL渲染器配置，提高手机兼容性
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: false, 
+                powerPreference: "high-performance", 
+                stencil: false,
+                alpha: false,
+                preserveDrawingBuffer: false
+            });
             renderer.setSize(wrapper.clientWidth, wrapper.clientHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -567,7 +580,7 @@
                     },
                     runningMode: "VIDEO", numHands: 1
                 });
-                  
+                    
                 const video = document.getElementById("input-video");
                 // 改进摄像头权限请求处理
                 try {
@@ -583,7 +596,7 @@
                     document.getElementById('loading').style.display = 'none';
                     return null;
                 }
-                  
+                    
                 video.addEventListener("loadeddata", () => {
                     document.getElementById('loading').style.display = 'none';
                     updateStatus("系统就绪，请伸手", "#0f0");
@@ -597,6 +610,42 @@
                 updateStatus("手势功能不可用，基础功能仍可使用", "#ff6600");
                 // 程序继续运行，只是没有手势识别功能
             }
+        }
+        
+        // 添加触摸事件支持
+        function initTouchEvents() {
+            const container = document.getElementById('canvas-container');
+            let isTouching = false;
+            let lastTouch = { x: 0, y: 0 };
+            
+            container.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                isTouching = true;
+                lastTouch.x = e.touches[0].clientX;
+                lastTouch.y = e.touches[0].clientY;
+            });
+            
+            container.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                if (!isTouching) return;
+                
+                const touch = e.touches[0];
+                const deltaX = touch.clientX - lastTouch.x;
+                const deltaY = touch.clientY - lastTouch.y;
+                
+                // 旋转场景
+                if (currentState === STATE.SCATTER || currentState === STATE.ORBIT) {
+                    mainGroup.rotation.y += deltaX * 0.005;
+                    mainGroup.rotation.x += deltaY * 0.005;
+                }
+                
+                lastTouch.x = touch.clientX;
+                lastTouch.y = touch.clientY;
+            });
+            
+            container.addEventListener('touchend', () => {
+                isTouching = false;
+            });
         }
 
         let lastVideoTime = -1;
@@ -787,10 +836,11 @@
         initUploadTrigger();
         // 初始化Three.js场景
         initThree();
+        // 初始化触摸事件支持
+        initTouchEvents();
         // 启动动画循环
         animate();
         // 初始化手势识别（可选）
         setupMediaPipe();
     </script>
 </body>
-</html>
